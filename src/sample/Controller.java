@@ -8,6 +8,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -38,11 +40,11 @@ public class Controller implements Initializable {
         XYChart.Series<Number, Number> lower = new XYChart.Series<>();
 
         lower.setName("E(f) - b");
-        tab(lower, x -> func(x) - 9);
+        tab(lower, x -> func(x) - 3 * b(x));
 
         XYChart.Series<Number, Number> upper = new XYChart.Series<>();
         upper.setName("E(f) + b");
-        tab(upper, x -> func(x) + 9);
+        tab(upper, x -> func(x) + 3 * b(x));
 
         XYChart.Series<Number, Number> expectation = new XYChart.Series<>();
         expectation.setName("E(f)");
@@ -73,7 +75,9 @@ public class Controller implements Initializable {
     }
 
     private Double rand(int x) {
-        return Math.random() * 10;
+        int pos = ((int) (Math.random() * 1e+9)) % V.size();
+        double eta = V.get(pos);
+        return ksi(eta, x);
     }
 
     private void initPoints(XYChart.Series<Number, Number> points) {
@@ -84,14 +88,14 @@ public class Controller implements Initializable {
 
     private void tabInt(XYChart.Series<Number, Number> points, Function<Integer, Double> f) {
         for(int x=L; x<=R; x++) {
-            points.getData().get(x-L).setYValue(f.apply(x-L));
+            points.getData().get(x-L).setYValue(f.apply(x));
         }
     }
 
     private Double expectation(int point) {
         double sum = 0;
         for(int i=0; i<N; ++i) {
-            double value = gen.get(i).getData().get(point).getYValue().doubleValue();
+            double value = gen.get(i).getData().get(point-L).getYValue().doubleValue();
             sum += value;
         }
         return sum / N;
@@ -104,19 +108,49 @@ public class Controller implements Initializable {
         }
     }
 
+    double ksi(double eta, double t) {
+        return eta*(t*t - 2*t + 3) - Math.sin(t);
+    }
+
+    public Double b(Double t) {
+        return 3 * (t*t - 2*t + 3);
+    }
+
     public Double func(Double x) {
-        return x*x;
+        return ksi(2, x);
+    }
+
+    private List<Double> V = new ArrayList<>();
+
+    double gauss(double x, double a, double d) {
+        return Math.exp((x-a)*(a-x)/(2*d*d)) / Math.sqrt(2 * Math.PI) / d;
+    }
+
+    void G(double a, double d, double lr, int iter) {
+        double l = a - lr;
+        double r = a + lr;
+        double step = (r-l) / iter;
+        while (l < r) {
+            System.out.println(l);
+            double v = gauss(l, a, d);
+            int x = (int) (v*1000);
+            for(int i=0; i<x; ++i){
+                V.add(l);
+            }
+            l+=step;
+        }
+        System.out.println(V.size());
     }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        G(2,3, 10, 1000);
         chartData = getSeries();
         chart.setData(chartData);
         addStyles();
     }
 
     private void addStyles() {
-
         Consumer<Integer> addStyle1 = (x) -> {
             chartData.get(x).getNode().setStyle("" +
                     "-fx-stroke-width: 1px; " +
@@ -124,11 +158,9 @@ public class Controller implements Initializable {
         };
         addStyle1.accept(1);
         addStyle1.accept(2);
-
         chartData.get(0).getNode().setStyle(("" +
                 "-fx-stroke-width: 2px;" +
                 "-fx-opacity: 0.5;" +
-
                 "-fx-stroke: red"));
 
         Consumer<Integer> addStyleGen = i -> {
